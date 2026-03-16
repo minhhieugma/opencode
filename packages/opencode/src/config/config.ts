@@ -166,6 +166,21 @@ export namespace Config {
       result.plugin.push(...(await loadPlugin(dir)))
     }
 
+    // Load commands from external directories (.claude/commands/, .agents/commands/)
+    const EXTERNAL_COMMAND_DIRS = [".claude", ".agents"]
+    for (const dir of EXTERNAL_COMMAND_DIRS) {
+      const root = path.join(Global.Path.home, dir)
+      if (await Filesystem.isDir(root))
+        result.command = mergeDeep(result.command ?? {}, await loadCommand(root))
+    }
+    for await (const root of Filesystem.up({
+      targets: EXTERNAL_COMMAND_DIRS,
+      start: Instance.directory,
+      stop: Instance.worktree,
+    })) {
+      result.command = mergeDeep(result.command ?? {}, await loadCommand(root))
+    }
+
     // Inline config content overrides all non-managed config sources.
     if (process.env.OPENCODE_CONFIG_CONTENT) {
       result = mergeConfigConcatArrays(
@@ -354,7 +369,16 @@ export namespace Config {
       })
       if (!md) continue
 
-      const patterns = ["/.opencode/command/", "/.opencode/commands/", "/command/", "/commands/"]
+      const patterns = [
+        "/.opencode/command/",
+        "/.opencode/commands/",
+        "/.claude/command/",
+        "/.claude/commands/",
+        "/.agents/command/",
+        "/.agents/commands/",
+        "/command/",
+        "/commands/",
+      ]
       const file = rel(item, patterns) ?? path.basename(item)
       const name = trim(file)
 

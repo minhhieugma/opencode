@@ -628,6 +628,51 @@ Nested command template`,
   })
 })
 
+test("loads commands from .claude/commands", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      const claudeDir = path.join(dir, ".claude")
+      await fs.mkdir(claudeDir, { recursive: true })
+
+      const commandsDir = path.join(claudeDir, "commands")
+      await fs.mkdir(path.join(commandsDir, "nested"), { recursive: true })
+
+      await Filesystem.write(
+        path.join(commandsDir, "hello.md"),
+        `---
+description: Claude command
+---
+Hello from claude commands`,
+      )
+
+      await Filesystem.write(
+        path.join(commandsDir, "nested", "child.md"),
+        `---
+description: Nested claude command
+---
+Nested claude command template`,
+      )
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const config = await Config.get()
+
+      expect(config.command?.["hello"]).toEqual({
+        description: "Claude command",
+        template: "Hello from claude commands",
+      })
+
+      expect(config.command?.["nested/child"]).toEqual({
+        description: "Nested claude command",
+        template: "Nested claude command template",
+      })
+    },
+  })
+})
+
 test("updates config and writes to file", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
